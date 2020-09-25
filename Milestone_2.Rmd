@@ -1,0 +1,55 @@
+---
+title: 'Milestone #2'
+author: "Yifan Chen"
+date: "9/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Project: [The Language of Emojis (Linda Qin)](https://linda-qin.shinyapps.io/gov1005-emojis/)
+
+Pros: The author of the project collected her own data through a survey,
+which likely had made it easier for her to get the exact data she needs to 
+answer her question of "how do people choose emojis to use when expressing their
+feelings? On the first page of her shiny-app, she structured her project well,
+making it relatively smooth for the audience to follow the steps she took to 
+complete her project and exactly how she collected her data. Instead of simply
+showing graphs, she also created a web that represents a network that charts 
+the relationship between different emojis, which is something I found unique
+about this project.
+
+Cons: While the author also acknowledge this issue in her write-up, I wanted to 
+emphasize that the reponses to her survey was skewed towards certain Harvard
+populations. For example, there were twice as many female-identifying students
+than male-identifying students that answered her survey, and the Asian student
+population was definitely over-represented compared to other races. She broke
+down emoji use by class year, state, gender, and House to account for the 
+possible covariates, but it would also be helpful if she also accounted for
+race when facetting her graphs by different demographics. 
+
+
+## Project: [Need a Good Date Spot? (Grace Pan)](https://gracepan.shinyapps.io/yelp_dating/)
+
+Pros: The author made her graphs extremely interactive in her project, allowing
+the audience to actively "engage" with her data. The audience can select 3 
+different cuisines at once to compare their likelihood of receive positive
+reviews on Yelp and their likelihood of being good date spots on Yelp, 
+represented through a coefficient. From the audience's perspective, this project 
+is a simple and straightforward one, with two purposes: comparing cuisines to 
+find the best spot for a date. Lastly, based on the "Methods" tab of the shiny-
+app, the author explained in detail how she cleaned her data in four steps,
+which is helpful to follow even for those who do not have extensive experience
+in data science or R. 
+
+Cons: Because the author scraped data from Yelp review to identify keywords
+related to "dates", it would have been helpful if she made it more transparent 
+to the audience all of the keywords that she used instead of just providing a 
+few examples in her description. For example, the word "date" has two 
+meanings: a meeting between (potential) partners or the meaning related to a
+particular day. I would be interested to find out how she might account for 
+this issue during her data collection, if at since since I'd imagine the two
+meanings would both be used frequently in Yelp reviews. 
+
