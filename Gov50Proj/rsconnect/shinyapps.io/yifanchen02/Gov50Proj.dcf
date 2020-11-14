@@ -1,0 +1,13 @@
+name: Gov50Proj
+title: Gov50Proj
+username:
+account: yifanchen02
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2905545
+bundleId: 3829247
+url: https://yifanchen02.shinyapps.io/Gov50Proj/
+when: 1604695363.83365
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: SociologyDegrees.xls|SociologyPay.xls|Student_Characteristics_Aid15-16.xls|StudentCharacteristics(private).xls|StudentCharacteristics(public).xls|tabn333.90.xls|tabn411.xls|WorldDegreeAttainment.xls
