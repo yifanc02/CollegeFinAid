@@ -6,156 +6,37 @@
 #
 #    http://shiny.rstudio.com/
 #
-
 library(shiny)
 library(shinythemes)
 library(tidyverse)
 library(readxl)
 library(gganimate)
-library(gifski)
 library(janitor)
+library(gifski)
 library(rstanarm)
 library(gt)
 library(gtsummary)
 library(broom.mixed)
 
-setwd("~/Dropbox/Gov50/unifunds/Gov50Proj")
+# Goals for the project and general to-do list
+# Make the first financial aid plots with different scales
+# Specify columns and layout
+# Student demographics - filter by year as well (right now it's just 2015-2016 data)
+# Organize modeling page (add some graphs as well)
 
-allinstitutions <- read_excel("PercentageFinancialAid2000-2018.xls", skip = 1) %>%
-  select(1:8, 13:16)
 
-colnames(allinstitutions) <- c("academic_year", "enrollment", 
-                              "total_number_awarded", "total_percent_awarded",
-                              "fed", "state_local", "institutional", 
-                              "student_loans", "fed_amt", "state_local_amt", 
-                              "institutional_amt",
-                              "loan_amt")
-
-allinstitutions <- allinstitutions %>%
-  mutate(academic_year = as.numeric(substr(academic_year, 1, 4)))
-
-allinstitutions_percent <- allinstitutions %>%
-  select(1:8) %>%
-  slice(5:22) %>% 
-  drop_na() %>%
-  mutate(type = "All")
-
-select_type <- function(row_select, x){
-  allinstitutions %>%
-    select(1:8) %>%
-    mutate(academic_year = as.numeric(substr(academic_year, 1, 4))) %>%
-    slice(row_select)
+institutions_percent <- readRDS("institutions_percent.rds")
+institutions_amt <- readRDS("institutions_amt.rds")
+demographic <- readRDS("demographic.rds")
   
-}
-
-public <- select_type(24:31) %>%
-  mutate(type = "Public")
-
-private4prof <- select_type(78:85) %>%
-  mutate(type = "Private For-Profit Colleges")
-
-privatenonprof <- select_type(51:58) %>%
-  mutate(type = "Private Nonprofit Colleges")
-
-# Bind them all together
-
-institutions_percent <- bind_rows(list(public, private4prof, privatenonprof)) %>%
-  mutate_at(vars(fed:student_loans), as.numeric)
-
-
-# Now let's work on the amount
-allinstitutions_amt <- allinstitutions %>%
-  select(1, 9:12) %>%
-  slice(5:22) %>% 
-  drop_na() %>%
-  mutate(type = "All")
-
-select_type2 <- function(row_select, x){
-  allinstitutions %>%
-    select(1, 9:12) %>%
-    slice(row_select)
-  
-}
-
-public_amt <- select_type2(24:31) %>%
-  mutate(type = "Public")
-
-private4prof_amt <- select_type2(78:85) %>%
-  mutate(type = "Private For-Profit Colleges")
-
-privatenonprof_amt <- select_type2(51:58) %>%
-  mutate(type = "Private Nonprofit Colleges")
-
-institutions_amt <- bind_rows(list(public_amt, private4prof_amt, privatenonprof_amt)) %>%
-  mutate_at(vars(fed_amt:loan_amt), as.numeric)
-
-#Now lets turn to personal characteristics
-
-characteristics <- read_excel("Student_Characteristics_Aid15-16.xls", skip = 2)
- 
-#By sex, race, and family income level
-
-characteristics <- characteristics %>%
-slice(c(5:6, 9:15, 18:20, 23:25, 29:34, 43:45)) %>%
-  select(1, 2, 8, 14, 20)
-
-colnames(characteristics) <- c("characteristic", 
-                               "any_aid", 
-                               "grants", 
-                               "loans",
-                               "work_study")
-
-# Sex, race, age, marital status, income, housing status 15-16, thinking about doing this by year:
-# 03-04, 07-08, 11-12 as well
-
-sex <- characteristics %>%
-  slice(1:2) %>%
-  clean_names() %>%
-  select(characteristic, any_aid, grants, loans, work_study) %>%
-  mutate(data_type = "sex")
-         
-race <- characteristics %>%
-  slice(3:9) %>%
-  clean_names() %>%
-  select(characteristic, any_aid, grants, loans, work_study) %>%
-  drop_na() %>%
-  mutate(data_type = "race")
-
-age <- characteristics %>%
-  slice(10:12) %>%
-  clean_names() %>%
-  select(characteristic, any_aid, grants, loans, work_study) %>%
-  mutate(data_type = "age")
-
-marital <- characteristics %>%
-  slice(13:15) %>%
-  clean_names() %>%
-  select(characteristic, any_aid, grants, loans, work_study) %>%
-  mutate(data_type = "martial_status")
-
-fam_inc <- characteristics %>%
-  slice(16:21) %>%
-  clean_names() %>%
-  select(characteristic, any_aid, grants, loans, work_study) %>%
-  mutate(data_type = "fam_inc")
-
-housing <- characteristics %>%
-  slice(22:24) %>%
-  clean_names() %>%
-  select(characteristic, any_aid, grants, loans, work_study) %>%
-  mutate(data_type = "housing")
-
-demographic <- bind_rows(sex, race, fam_inc, marital, housing, age) %>%
-  mutate(work_study = ifelse(work_study == "‡", 0, work_study)) %>%
-  mutate(characteristic = str_remove_all(characteristic, "\\.")) %>%
-  pivot_longer(cols = c(-characteristic, -data_type), names_to = "aid_type", values_to = "amount") %>%
-  mutate(amount = as.numeric(amount))
-  
+# Trying to create demographics before 
 # Trying to create a model
 
 model_data <- read_csv("sfa1819.csv")
 
 model_data_1819 <- model_data %>% 
+  select(GIS4N2, GIS4N12, GIS4N22, GIS4N32, GIS4N42, GIS4N52, UFLOANP, IGRNT_P,
+         UPGRNTP) %>%
   mutate(totalnum = GIS4N2,
          pctnum_0_30 = GIS4N12/totalnum*100,
          pctnum_30_48 = GIS4N22/totalnum*100,
@@ -172,33 +53,18 @@ model_loans <- stan_glm(data = model_data_1819,
                         loans ~ pctnum_75_110 + pctnum_110,
                         refresh = 0)
 
-print(model_loans, digits = 4)
-results <- model_loans %>%
-  as_tibble()
-
-# Level of institutional aid
-
 model_instit <- stan_glm(data = model_data_1819, 
                          instit_aid ~ 
                         pctnum_75_110 + pctnum_110,
                          refresh = 0)
 
-print(model_instit, digits = 4)
+ggplot(model_data_1819, aes(x = (pctnum_75_110 + pctnum_110), y = instit_aid)) +
+  geom_point() +
+  geom_smooth(method='lm')
 
-model_table <- tbl_regression(model_instit, intercept = TRUE) %>%
-  as_gt() %>%
-  tab_header(title = "Regression of Student Household Income and Institutional Aid",
-             subtitle = "Richer Student Body Correlates with More Institutional Aid") %>%
-  tab_source_note("Source: NCES Data")
-
-model_table
-
-#Percent of students awarded institutional aid, 
-#Percent of undergraduates awarded student loans
-#Percent of undergraduate students awarded Pell grants
-#Percentage of students in fall cohort who are paying in-district tuition rates
-#Percentage of students in fall cohort who are paying out-of-state tuition rates
-
+ggplot(model_data_1819, aes(x = (pctnum_75_110 + pctnum_110), y = loans)) +
+  geom_point() +
+  geom_smooth(method='lm')
 
 
 # Define UI for application that draws a line plot
@@ -246,25 +112,33 @@ ui <- navbarPage(
              fluidPage(
                  titlePanel("Financial Aid Plots by Institution"),
                  sidebarLayout(
-                     sidebarPanel(p("This is a line plot of showing the percentage of first-time, full-time undergraduate
-                                    students who received financial aid for their college education starting from the year 2000"),
+                     sidebarPanel(p("These plots show the historical trends of how college financial has changed on an institutional level
+                    for first-time, full-time undergraduate students from the year 2000 to 2018."),
                                   selectInput(inputId = "type", 
                                               label = "Select Type of Aid",
                                               choices = list(
-                                                "Total Percent Award" = "total_percent_awarded",
                                                 "Federal Aid" = "fed",
                                                 "State or Local Aid" = "state_local",
                                                 "Institutional Aid" = "institutional",
                                                 "Student Loans" = "student_loans")
                                                 )),
-                     mainPanel(plotOutput("financialaidplot"))),
-             )),
+                     
+                     # Need to create new selectInput options
+                     mainPanel(
+                       tabsetPanel(type = "tabs",
+                                           tabPanel("Percentage", plotOutput("financialaidplot"),
+                                                    h2("Title"),
+                                                    p("Explanation")),
+                                           tabPanel("Amount", plotOutput("financialaid_amt"),
+                                                    h2("Title"),
+                                                    p("Explanation")))
+             )))),
     tabPanel("Student Demographics",
              fluidPage(
-               titlePanel("Financial Aid Plots by Student Characteristics"),
+               titlePanel("Financial Aid by Student Characteristics"),
                sidebarLayout(
                  sidebarPanel(p("These are bar plots showing the amount of financial aid received by students
-                                based on individual characteristics"),
+                                based on individual characteristics using data collected for the 2015-2016 school year"),
                               selectInput(inputId = "data_type", 
                                           label = "Select Student Characteristic",
                                           choices = list(
@@ -284,7 +158,8 @@ ui <- navbarPage(
                     p("This model predicts how the percentage of students receiving 
                 institutional aid changes with every percentage increase of students
                 from a certain household income level"),
-             mainPanel(gt_output("institution_corr")),
+             mainPanel(gt_output("institution_corr"),
+                       plotOutput("institution_plot")),
              p("Interpretation: [will add interpretation here")),
              
              column(12,
@@ -292,7 +167,8 @@ ui <- navbarPage(
              p("This model predicts how the percentage of students taking out loans
              changes with every percentage increase of students from a certain 
                household income level"),
-             mainPanel(gt_output("loans_corr")),
+             mainPanel(gt_output("loans_corr"),
+                       plotOutput("loans_plot")),
              p("Interpretation: [will add interpretation here]"))),
              
     tabPanel("Discussion",
@@ -309,16 +185,29 @@ server <- function(input, output) {
     output$financialaidplot<- renderPlot({
             ggplot(institutions_percent, aes_string(x="academic_year", y=input$type)) +
             geom_line(color = "red") +
-            geom_point() +
-            theme(panel.spacing = unit(5,"lines")) +
-            theme_bw() +
-            facet_wrap(~type, nrow = 3) +
+            geom_point(size = 1) +
+            theme_gray() +
+            facet_wrap(~type, nrow = 3, scales = "free_y") +
+            theme(panel.spacing = unit(3,"lines"),
+                  text = element_text(size = 15)) +
             labs(title = "Percentage of Aid Awarded by Year",
                  y = "Percentage",
                  x = "Academic Year") 
     })
     
-    
+    output$financialaid_amt <- renderPlot({
+      ggplot(institutions_amt, aes_string(x="academic_year", y=input$type)) +
+        geom_line(color = "blue") +
+        geom_point(size = 1) +
+        theme_gray() +
+        facet_wrap(~type2, nrow = 3, scales = "free_y") +
+        theme(panel.spacing = unit(3,"lines"),
+              text = element_text(size = 15)) +
+        labs(title = "Amount of Aid Awarded by Year",
+             y = "Dollar Amount",
+             x = "Academic Year") 
+      
+    })
     output$financialaidplot2<- renderPlot({
       demographic %>%
         filter(data_type == input$data_type) %>%
@@ -347,6 +236,19 @@ server <- function(input, output) {
         tab_source_note("Source: NCES Data")
     
   })
+    output$institution_plot<- renderPlot({
+      ggplot(model_data_1819, aes(x = (pctnum_75_110 + pctnum_110), y = instit_aid)) +
+        geom_point() +
+        geom_smooth(method='lm')
+    
+    })
+    
+    output$loans_plot<- renderPlot({
+      ggplot(model_data_1819, aes(x = (pctnum_75_110 + pctnum_110), y = loans)) +
+        geom_point() +
+        geom_smooth(method='lm')
+      
+    })
     
     output$loans_corr <- render_gt({
       tbl_regression(model_loans, intercept = TRUE) %>%

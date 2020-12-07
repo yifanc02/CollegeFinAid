@@ -1,0 +1,179 @@
+---
+title: "Gather.Rmd"
+author: "Yifan Chen"
+date: "12/4/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r creating dataset}
+allinstitutions <- read_excel("PercentageFinancialAid2000-2018.xls", skip = 1) %>%
+  select(1:8, 13:16)
+
+colnames(allinstitutions) <- c("academic_year", "enrollment", 
+                              "total_number_awarded", "total_percent_awarded",
+                              "fed", "state_local", "institutional", 
+                              "student_loans", "fed_amt", "state_local_amt", 
+                              "institutional_amt",
+                              "loan_amt")
+
+allinstitutions <- allinstitutions %>%
+  mutate(academic_year = as.numeric(substr(academic_year, 1, 4)))
+
+allinstitutions_percent <- allinstitutions %>%
+  select(1:8) %>%
+  slice(5:22) %>% 
+  drop_na() %>%
+  mutate(type = "All")
+
+select_type <- function(row_select, x){
+  allinstitutions %>%
+    select(1:8) %>%
+    mutate(academic_year = as.numeric(substr(academic_year, 1, 4))) %>%
+    slice(row_select)
+  
+}
+
+public <- select_type(24:31) %>%
+  mutate(type = "Public")
+
+private4prof <- select_type(78:85) %>%
+  mutate(type = "Private For-Profit Colleges")
+
+privatenonprof <- select_type(51:58) %>%
+  mutate(type = "Private Nonprofit Colleges")
+
+# Bind them all together
+
+# institutions_percent <- bind_rows(list(public, private4prof, privatenonprof)) %>%
+#   mutate_at(vars(fed:student_loans), as.numeric)
+
+# saveRDS(institutions_percent, file = "institutions_percent.rds")
+
+allinstitutions_amt <- allinstitutions %>%
+  select(1, 9:12) %>%
+  slice(5:22) %>% 
+  drop_na() %>%
+  mutate(type2 = "All")
+
+select_type2 <- function(row_select, x){
+  allinstitutions %>%
+    select(1, 9:12) %>%
+    slice(row_select)
+  
+}
+
+
+public_amt <- select_type2(24:31) %>%
+  mutate(type2 = "Public")
+
+private4prof_amt <- select_type2(78:85) %>%
+  mutate(type2 = "Private For-Profit Colleges")
+
+privatenonprof_amt <- select_type2(51:58) %>%
+  mutate(type2 = "Private Nonprofit Colleges")
+
+institutions_amt <- bind_rows(list(public_amt, private4prof_amt, privatenonprof_amt)) %>%
+  mutate_at(vars(fed_amt:loan_amt), as.numeric) %>%
+  rename(fed = fed_amt,
+         state_local = state_local_amt,
+         student_loans = loan_amt,
+         institutional = institutional_amt)
+
+saveRDS(institutions_amt, file = "institutions_amt.rds")
+
+```
+
+```{r demographic}
+#Now lets turn to personal characteristics
+
+characteristics_1516 <- read_excel("Student_Characteristics_Aid15-16.xls", skip = 2)
+ 
+#By sex, race, and family income level
+
+characteristics_1516 <- characteristics_1516 %>%
+slice(c(5:6, 9:15, 18:20, 23:25, 29:34, 43:45)) %>%
+  select(1, 2, 8, 14, 20)
+
+colnames(characteristics_1516) <- c("characteristic", 
+                               "any_aid", 
+                               "grants", 
+                               "loans",
+                               "work_study")
+
+# Sex, race, age, marital status, income, housing status 15-16, thinking about doing this by year:
+# 03-04, 07-08, 11-12 as well
+
+sex <- characteristics_1516 %>%
+  slice(1:2) %>%
+  clean_names() %>%
+  select(characteristic, any_aid, grants, loans, work_study) %>%
+  mutate(data_type = "sex")
+         
+race <- characteristics_1516 %>%
+  slice(3:9) %>%
+  clean_names() %>%
+  select(characteristic, any_aid, grants, loans, work_study) %>%
+  drop_na() %>%
+  mutate(data_type = "race")
+
+age <- characteristics_1516 %>%
+  slice(10:12) %>%
+  clean_names() %>%
+  select(characteristic, any_aid, grants, loans, work_study) %>%
+  mutate(data_type = "age")
+
+marital <- characteristics_1516 %>%
+  slice(13:15) %>%
+  clean_names() %>%
+  select(characteristic, any_aid, grants, loans, work_study) %>%
+  mutate(data_type = "marital_status")
+
+fam_inc <- characteristics_1516 %>%
+  slice(16:21) %>%
+  clean_names() %>%
+  select(characteristic, any_aid, grants, loans, work_study) %>%
+  mutate(data_type = "fam_inc")
+
+housing <- characteristics_1516 %>%
+  slice(22:24) %>%
+  clean_names() %>%
+  select(characteristic, any_aid, grants, loans, work_study) %>%
+  mutate(data_type = "housing")
+
+demographic <- bind_rows(sex, race, fam_inc, marital, housing, age) %>%
+  mutate(work_study = ifelse(work_study == "‡", 0, work_study)) %>%
+  mutate(characteristic = str_remove_all(characteristic, "\\.|\\\\5|\\\\")) %>%
+  pivot_longer(cols = c(-characteristic, -data_type), names_to = "aid_type", values_to = "amount") %>%
+  mutate(amount = as.numeric(amount))
+
+saveRDS(demographic, file = "demographic.rds")
+
+institutions_percent %>%
+        ggplot(aes(x = total_number_awarded, y = total_percent_awarded)) +
+        geom_point() +
+        geom_smooth(state = "smooth", position = "identity")
+        theme_bw() +
+        labs(title = "Regression",
+             y = "Percent",
+             x = "Count")
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
