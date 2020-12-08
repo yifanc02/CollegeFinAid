@@ -25,29 +25,19 @@ library(broom.mixed)
 # Organize modeling page (add some graphs as well)
 
 
+# Reading the data that I cleaned 
+
 institutions_percent <- readRDS("institutions_percent.rds")
 institutions_amt <- readRDS("institutions_amt.rds")
 demographic <- readRDS("demographic.rds")
-  
+model_data_1819 <- readRDS("model_data_1819.rds")
 # Trying to create demographics before 
 # Trying to create a model
 
-model_data <- read_csv("sfa1819.csv")
+# This runs a predictive model on how institutional demographical make-up 
+# correlates with what percentage of the student body takes out loans, receives
+# institutional aid, and pell grants.
 
-model_data_1819 <- model_data %>% 
-  select(GIS4N2, GIS4N12, GIS4N22, GIS4N32, GIS4N42, GIS4N52, UFLOANP, IGRNT_P,
-         UPGRNTP) %>%
-  mutate(totalnum = GIS4N2,
-         pctnum_0_30 = GIS4N12/totalnum*100,
-         pctnum_30_48 = GIS4N22/totalnum*100,
-         pctnum_48_75 = GIS4N32/totalnum*100,
-         pctnum_75_110 = GIS4N42/totalnum*100,
-         pctnum_110 = GIS4N52/totalnum*100,
-         instit_aid = IGRNT_P, 
-         loans = UFLOANP,
-         pell = UPGRNTP) %>%
-  select(totalnum:pell) %>%
-  drop_na()
 
 model_loans <- stan_glm(data = model_data_1819, 
                         loans ~ pctnum_75_110 + pctnum_110,
@@ -58,14 +48,9 @@ model_instit <- stan_glm(data = model_data_1819,
                         pctnum_75_110 + pctnum_110,
                          refresh = 0)
 
-ggplot(model_data_1819, aes(x = (pctnum_75_110 + pctnum_110), y = instit_aid)) +
-  geom_point() +
-  geom_smooth(method='lm')
-
-ggplot(model_data_1819, aes(x = (pctnum_75_110 + pctnum_110), y = loans)) +
-  geom_point() +
-  geom_smooth(method='lm')
-
+model_pell <- stan_glm(data = model_data_1819,
+                       pell ~ pctnum_0_30 + pctnum_30_48,
+                       refresh = 0)
 
 # Define UI for application that draws a line plot
 ui <- navbarPage(
@@ -73,7 +58,7 @@ ui <- navbarPage(
   # This is the title for my Shiny App!
     "Analyzing College Accessibility Through Funding Options",
     
-    # Creating first panel to give an introudction of my project
+    # Creating first panel to give an introduction of my project. I 
     tabPanel("About", 
              column(6,
              fluidPage(theme = shinytheme("flatly"),
@@ -160,7 +145,9 @@ ui <- navbarPage(
                 from a certain household income level"),
              mainPanel(gt_output("institution_corr"),
                        plotOutput("institution_plot")),
-             p("Interpretation: [will add interpretation here")),
+             p("Interpretation: Higher education institutions with a wealthier
+               student body (household income above 75K a year) are associated with 
+               higher rates of students receiving institutional aid.")),
              
              column(12,
              h2("Loans"),
@@ -169,7 +156,22 @@ ui <- navbarPage(
                household income level"),
              mainPanel(gt_output("loans_corr"),
                        plotOutput("loans_plot")),
-             p("Interpretation: [will add interpretation here]"))),
+             p("Interpretation: Higher education institutions with a wealthier
+               student body (household income above 75K a year) are associated with 
+               higher rates of students taking out loans to fund their education.")),
+             
+    # Might need to figure out how columns work.
+    
+    column(12,
+           h2("Pell Grants"),
+           p("This model predicts how the percentage of students receiving pell grants
+             changes with every percentage increase of students from a certain 
+               household income level"),
+           mainPanel(gt_output("pell_corr"),
+                     plotOutput("pell_plot")),
+           p("Interpretation: Higher education institutions with a lower-income
+               student body (household income below 48K a year) are associated with 
+               higher rates of students receiving pell grants."))),
              
     tabPanel("Discussion",
              titlePanel("Work in Progress"),
@@ -181,6 +183,10 @@ ui <- navbarPage(
 
 # No longer want a gif/graphic. Non-animated plots might work better here
 server <- function(input, output) {
+  
+  # This is the first plot shown on the second tab with percentage of aid 
+  # awarded by year. The NCES dataset reports the average, so it wasn't something
+  # that I needed to calculate from microdata.
   
     output$financialaidplot<- renderPlot({
             ggplot(institutions_percent, aes_string(x="academic_year", y=input$type)) +
@@ -195,6 +201,11 @@ server <- function(input, output) {
                  x = "Academic Year") 
     })
     
+    
+    # Second plot, showing amount instead of percentages. Otherwise, it's a similar
+    # graph to the one above. Might add breaks in here to show off all of the years
+    # presented in the data.
+    
     output$financialaid_amt <- renderPlot({
       ggplot(institutions_amt, aes_string(x="academic_year", y=input$type)) +
         geom_line(color = "blue") +
@@ -206,6 +217,9 @@ server <- function(input, output) {
         labs(title = "Amount of Aid Awarded by Year",
              y = "Dollar Amount",
              x = "Academic Year") 
+      
+    # Tab on student characteristics. Need to clean up the names and the title 
+    # to make things look more professional here. 
       
     })
     output$financialaidplot2<- renderPlot({
@@ -228,6 +242,9 @@ server <- function(input, output) {
            alt = "This is alternate text"
       )}, deleteFile = FALSE)
     
+    # Turning the stan_glm model into a table. I would need to add the interpretations
+    # in future iterations of the project, as well as an equation. 
+    
     output$institution_corr <- render_gt({
         model1 <- tbl_regression(model_instit, intercept = TRUE) %>%
         as_gt() %>%
@@ -236,17 +253,24 @@ server <- function(input, output) {
         tab_source_note("Source: NCES Data")
     
   })
+    
+    # For the table on institutional aid. 
+    
     output$institution_plot<- renderPlot({
-      ggplot(model_data_1819, aes(x = (pctnum_75_110 + pctnum_110), y = instit_aid)) +
-        geom_point() +
-        geom_smooth(method='lm')
+      ggplot(model_data_1819, aes(x = (pctnum_75_110 + pctnum_110), y = instit_aid, 
+                                  size = totalnum, color = totalnum)) +
+        geom_point(alpha = 0.6) +
+        geom_smooth(method='lm') +
+        scale_color_gradient(low="blue", high="red")
     
     })
     
     output$loans_plot<- renderPlot({
-      ggplot(model_data_1819, aes(x = (pctnum_75_110 + pctnum_110), y = loans)) +
-        geom_point() +
-        geom_smooth(method='lm')
+      ggplot(model_data_1819, aes(x = (pctnum_75_110 + pctnum_110), y = loans,
+                                  size = totalnum, color = totalnum)) +
+        geom_point(alpha = 0.6) +
+        geom_smooth(method='lm') +
+        scale_color_gradient(low="blue", high="red")
       
     })
     
@@ -258,11 +282,35 @@ server <- function(input, output) {
       tab_source_note("Source: NCES Data")
     
 })
+    # Creates a posterior probability table that estimates how a given university
+    # with only students above the 75K income bracket 
+    output$pell_corr <- render_gt({
+      tbl_regression(model_pell, intercept = TRUE) %>%
+        as_gt() %>%
+        tab_header(title = "Regression of Student Household Income and Pell Grants",
+                   subtitle = "Lower Income Student Body Associated with Higher Percentages
+                   of Students on Pell Grants") %>%
+        tab_source_note("Source: NCES Data")
+})
+    # Creates the plot showing how the percentages on pell grants increases
+    # with more lower-income students at an institution. 
+    
+    output$pell_plot<- renderPlot({
+      ggplot(model_data_1819, aes(x = (pctnum_0_30 + pctnum_30_48), y = pell, 
+                                  color = totalnum, size = totalnum)) +
+        geom_point(alpha = 0.6) +
+        geom_smooth(method='lm') +
+        scale_color_gradient(low="blue", high="red")
+      
+})
 }
 
 
 # Run the application 
 shinyApp(ui = ui, server = server)
+
+# This was the code that creates the animation, but because it took so long to 
+# run I chose not to use it. 
 
 # animate(p, nframes = 75, renderer = gifski_renderer("outfile.gif"))
 # output$financialaidplot<- renderImage({

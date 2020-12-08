@@ -5,9 +5,8 @@ account: yifanchen02
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 2905545
-bundleId: 3940882
+bundleId: 3960767
 url: https://yifanchen02.shinyapps.io/Gov50Proj/
-when: 1607044445.31682
+when: 1607444479.1048
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: SociologyDegrees.xls|SociologyPay.xls|tabn333.90.xls|tabn411.xls|WorldDegreeAttainment.xls

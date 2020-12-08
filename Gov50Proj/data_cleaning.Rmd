@@ -10,14 +10,14 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+This is a rmarkdown document where I save all of my data cleaning and wrangling
+work for my final project in Gov50. 
 
 ```{r creating dataset}
 allinstitutions <- read_excel("PercentageFinancialAid2000-2018.xls", skip = 1) %>%
   select(1:8, 13:16)
+
+# Renaming columns to make the variables understandable
 
 colnames(allinstitutions) <- c("academic_year", "enrollment", 
                               "total_number_awarded", "total_percent_awarded",
@@ -29,12 +29,15 @@ colnames(allinstitutions) <- c("academic_year", "enrollment",
 allinstitutions <- allinstitutions %>%
   mutate(academic_year = as.numeric(substr(academic_year, 1, 4)))
 
+# This selects for the information that takes into percentage of students receiving
+# aid (in all forms) across all institutions
 allinstitutions_percent <- allinstitutions %>%
   select(1:8) %>%
   slice(5:22) %>% 
   drop_na() %>%
   mutate(type = "All")
 
+# Making a function to make this process easier
 select_type <- function(row_select, x){
   allinstitutions %>%
     select(1:8) %>%
@@ -43,6 +46,7 @@ select_type <- function(row_select, x){
   
 }
 
+# Now I will filter by type of university by creating separate objects first. 
 public <- select_type(24:31) %>%
   mutate(type = "Public")
 
@@ -54,17 +58,22 @@ privatenonprof <- select_type(51:58) %>%
 
 # Bind them all together
 
-# institutions_percent <- bind_rows(list(public, private4prof, privatenonprof)) %>%
-#   mutate_at(vars(fed:student_loans), as.numeric)
+institutions_percent <- bind_rows(list(public, private4prof, privatenonprof)) %>%
+mutate_at(vars(fed:student_loans), as.numeric)
 
-# saveRDS(institutions_percent, file = "institutions_percent.rds")
+#Turning this into a RDS file. 
 
+saveRDS(institutions_percent, file = "institutions_percent.rds")
+
+# We now turn to the average amount of aid that students receive.
 allinstitutions_amt <- allinstitutions %>%
   select(1, 9:12) %>%
   slice(5:22) %>% 
   drop_na() %>%
   mutate(type2 = "All")
 
+# Creating a function like the one above, but this time it's for the amount of
+# aid rather than the percentage. 
 select_type2 <- function(row_select, x){
   allinstitutions %>%
     select(1, 9:12) %>%
@@ -72,6 +81,9 @@ select_type2 <- function(row_select, x){
   
 }
 
+# Following a similar workflow as before, filtered by different types of
+# institution and creating a column called "Type" so I can use facet wrap to
+# separate them later.
 
 public_amt <- select_type2(24:31) %>%
   mutate(type2 = "Public")
@@ -82,8 +94,15 @@ private4prof_amt <- select_type2(78:85) %>%
 privatenonprof_amt <- select_type2(51:58) %>%
   mutate(type2 = "Private Nonprofit Colleges")
 
-institutions_amt <- bind_rows(list(public_amt, private4prof_amt, privatenonprof_amt)) %>%
+# Binding them all together into a new object called institutions amount. This
+# is the data that I will plot in my shiny app.
+
+institutions_amt <- bind_rows(list(public_amt, private4prof_amt, 
+                                   privatenonprof_amt)) %>%
   mutate_at(vars(fed_amt:loan_amt), as.numeric) %>%
+  
+  # I had to rename this so that in Shinyapp, the selectInput type can recognize
+  # the 
   rename(fed = fed_amt,
          state_local = state_local_amt,
          student_loans = loan_amt,
@@ -98,7 +117,7 @@ saveRDS(institutions_amt, file = "institutions_amt.rds")
 
 characteristics_1516 <- read_excel("Student_Characteristics_Aid15-16.xls", skip = 2)
  
-#By sex, race, and family income level
+#By sex, race, and family income level, marital status, and housing arrangement
 
 characteristics_1516 <- characteristics_1516 %>%
 slice(c(5:6, 9:15, 18:20, 23:25, 29:34, 43:45)) %>%
@@ -110,8 +129,13 @@ colnames(characteristics_1516) <- c("characteristic",
                                "loans",
                                "work_study")
 
-# Sex, race, age, marital status, income, housing status 15-16, thinking about doing this by year:
-# 03-04, 07-08, 11-12 as well
+# Sex, race, age, marital status, income, housing status 15-16, thinking about 
+# doing this by year: 03-04, 07-08, 11-12 as well. 
+# But not all the variables are available for those academic years at the moment,
+# thinking about how to incorporate that. 
+
+# Upon further examination, I should have written a function for this, but it 
+# all works now. 
 
 sex <- characteristics_1516 %>%
   slice(1:2) %>%
@@ -150,30 +174,62 @@ housing <- characteristics_1516 %>%
   select(characteristic, any_aid, grants, loans, work_study) %>%
   mutate(data_type = "housing")
 
+# Now, it's time to combine this all together into one object.
 demographic <- bind_rows(sex, race, fam_inc, marital, housing, age) %>%
+  
+  # This involves some cleaning with missing data, and renaming some rows with
+  # odd and irrelevant symbols.
   mutate(work_study = ifelse(work_study == "‡", 0, work_study)) %>%
   mutate(characteristic = str_remove_all(characteristic, "\\.|\\\\5|\\\\")) %>%
+  
+  # Pivot the table format so we have a column specifying the type of aid the 
+  # students received, and the average amount of aid in that category. 
   pivot_longer(cols = c(-characteristic, -data_type), names_to = "aid_type", values_to = "amount") %>%
   mutate(amount = as.numeric(amount))
 
 saveRDS(demographic, file = "demographic.rds")
 
-institutions_percent %>%
-        ggplot(aes(x = total_number_awarded, y = total_percent_awarded)) +
-        geom_point() +
-        geom_smooth(state = "smooth", position = "identity")
-        theme_bw() +
-        labs(title = "Regression",
-             y = "Percent",
-             x = "Count")
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+```{r model data}
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+# Creating the model now. After visualizing all this data, I think the most 
+# interesting question for me is how do the wealth of the student body 
+# relate to what percentage of them receives a certain type of aid or takes out
+# loans?
+
+model_data <- read_csv("sfa1819.csv")
+
+# Selecting the variables I need. 
+model_data_1819 <- model_data %>% 
+  select(GIS4N2, GIS4N12, GIS4N22, GIS4N32, GIS4N42, GIS4N52, UFLOANP, IGRNT_P,
+         UPGRNTP, UAGRNTP) %>%
+  
+  # I divided the total number of students enrolled at a given university into
+  # brackets presenting percentages in each income bracket. 
+  
+  mutate(totalnum = GIS4N2,
+         pctnum_0_30 = GIS4N12/totalnum*100,
+         pctnum_30_48 = GIS4N22/totalnum*100,
+         pctnum_48_75 = GIS4N32/totalnum*100,
+         pctnum_75_110 = GIS4N42/totalnum*100,
+         pctnum_110 = GIS4N52/totalnum*100,
+         grant_aid = UAGRNTP,
+         instit_aid = IGRNT_P, 
+         loans = UFLOANP,
+         pell = UPGRNTP) %>%
+  select(totalnum:pell) %>%
+  drop_na()
+
+saveRDS(model_data_1819, file = "model_data_1819.rds")
+
+# Attempting a plot here for demo so that I can use it in the shinyApp. 
+ggplot(model_data_1819, aes(x = (pctnum_75_110 + pctnum_110), y = grant_aid, 
+                                  color = totalnum)) +
+        geom_point(alpha = 0.6) +
+        geom_smooth(method='lm') +
+        scale_color_gradient(low="blue", high="red")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
