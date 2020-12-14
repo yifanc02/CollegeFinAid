@@ -13,7 +13,13 @@ knitr::opts_chunk$set(echo = TRUE)
 This is a rmarkdown document where I save all of my data cleaning and wrangling
 work for my final project in Gov50. 
 
-```{r creating dataset}
+# Tab 2 (Institutional Level Trends)
+```{r in}
+
+# Read excel sheet into object.
+# This is for the first tab that calculates percentage of students receiving
+# different forms of aid. 
+
 allinstitutions <- read_excel("PercentageFinancialAid2000-2018.xls", skip = 1) %>%
   select(1:8, 13:16)
 
@@ -30,7 +36,8 @@ allinstitutions <- allinstitutions %>%
   mutate(academic_year = as.numeric(substr(academic_year, 1, 4)))
 
 # This selects for the information that takes into percentage of students receiving
-# aid (in all forms) across all institutions
+# aid (in all forms) across all institutions.
+
 allinstitutions_percent <- allinstitutions %>%
   select(1:8) %>%
   slice(5:22) %>% 
@@ -38,6 +45,7 @@ allinstitutions_percent <- allinstitutions %>%
   mutate(type = "All")
 
 # Making a function to make this process easier
+
 select_type <- function(row_select, x){
   allinstitutions %>%
     select(1:8) %>%
@@ -47,6 +55,10 @@ select_type <- function(row_select, x){
 }
 
 # Now I will filter by type of university by creating separate objects first. 
+# Public, private, and private institutions, and then combine them together.
+# Added a column called "type" since I will use that to differentiate the
+# type of insitution these these values represent.
+
 public <- select_type(24:31) %>%
   mutate(type = "Public")
 
@@ -65,15 +77,21 @@ mutate_at(vars(fed:student_loans), as.numeric)
 
 saveRDS(institutions_percent, file = "institutions_percent.rds")
 
+#############################
+
 # We now turn to the average amount of aid that students receive.
+
+# This calculates the amount across all institutions. 
+
 allinstitutions_amt <- allinstitutions %>%
   select(1, 9:12) %>%
-  slice(5:22) %>% 
+  slice(5:22) %>%
   drop_na() %>%
   mutate(type = "All")
 
 # Creating a function like the one above, but this time it's for the amount of
 # aid rather than the percentage. 
+
 select_type2 <- function(row_select, x){
   allinstitutions %>%
     select(1, 9:12) %>%
@@ -115,7 +133,8 @@ saveRDS(institutions_amt, file = "institutions_amt.rds")
 ```{r demographic}
 #Now lets turn to personal characteristics
 
-characteristics_1516 <- read_excel("Student_Characteristics_Aid15-16.xls", skip = 2)
+characteristics_1516 <- read_excel("Student_Characteristics_Aid15-16.xls", 
+                                   skip = 2)
  
 #By sex, race, and family income level, marital status, and housing arrangement
 
@@ -175,19 +194,25 @@ housing <- characteristics_1516 %>%
   mutate(data_type = "housing")
 
 # Now, it's time to combine this all together into one object.
+
 demographic <- bind_rows(sex, race, fam_inc, marital, housing, age) %>%
   
   # This involves some cleaning with missing data, and renaming some rows with
   # odd and irrelevant symbols.
+  
   mutate(work_study = ifelse(work_study == "‡", 0, work_study)) %>%
   mutate(characteristic = str_remove_all(characteristic, "\\.|\\\\5|\\\\")) %>%
   
   # Pivot the table format so we have a column specifying the type of aid the 
   # students received, and the average amount of aid in that category. 
-  pivot_longer(cols = c(-characteristic, -data_type), names_to = "aid_type", values_to = "amount") %>%
+  
+  pivot_longer(cols = c(-characteristic, -data_type), names_to = "aid_type", 
+               values_to = "amount") %>%
   mutate(amount = as.numeric(amount))
 
 saveRDS(demographic, file = "demographic.rds")
+
+suppressWarnings(expr)
 
 ```
 
@@ -198,6 +223,12 @@ saveRDS(demographic, file = "demographic.rds")
 # interesting question for me is how do the wealth of the student body 
 # relate to what percentage of them receives a certain type of aid or takes out
 # loans?
+
+# I'm going to suppress warnings here because it wants me to specify column 
+# types for all of the 295 columns in the dataset, which will take up so much 
+# unneccessary space on this rMarkdown document. 
+
+suppressWarnings(expr)
 model_data_1819 <- model_data %>% 
   select(GIS4N2, GIS4N12, GIS4N22, GIS4N32, GIS4N42, GIS4N52, UFLOANP, IGRNT_P,
          UPGRNTP, UAGRNTP) 
@@ -228,33 +259,36 @@ model_data_1819 <- model_data %>%
 
 saveRDS(model_data_1819, file = "model_data_1819.rds")
 
-# Calculating proportions of entire data set, then multiply by 100
-incsum_data_1819 <- model_data %>% 
-  select(GIS4N2, GIS4N12, GIS4N22, GIS4N32, GIS4N42, GIS4N52, UFLOANP, IGRNT_P,
-         UPGRNTP, UAGRNTP) %>%
-  summarize(pct_0_30 = sum(GIS4N12, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE),
-            pct_38_48 = sum(GIS4N22, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE),
-            pct_48_75 = sum(GIS4N32, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE),
-            pct_75_110 = sum(GIS4N42, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE),
-            pct_110 = sum(GIS4N52, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE)) %>%
-  pivot_longer(cols = 1:5, names_to = "inc_bracket", values_to = "percentages")
+# I was going to use this to graph something else, but realized it's no longere
+# neccessary. Keeping this as a comment just to track my progress.
 
+# Calculating proportions of entire data set, then multiply by 100
+# incsum_data_1819 <- model_data %>% 
+#   select(GIS4N2, GIS4N12, GIS4N22, GIS4N32, GIS4N42, GIS4N52, UFLOANP, IGRNT_P,
+#          UPGRNTP, UAGRNTP) %>%
+#   summarize(pct_0_30 = sum(GIS4N12, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE),
+#             pct_38_48 = sum(GIS4N22, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE),
+#             pct_48_75 = sum(GIS4N32, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE),
+#             pct_75_110 = sum(GIS4N42, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE),
+#             pct_110 = sum(GIS4N52, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE)) %>%
+#   pivot_longer(cols = 1:5, names_to = "inc_bracket", values_to = "percentages")
 
 ```
 
-```{r}
-# Test
-ggplot(institutions_percent, aes_string(x = "academic_year", 
-                                                    y = "student_loans",
-                                                    color = "type")) +
-            geom_line() +
-            geom_point(size = 1) +
-            theme_gray() +
-            #facet_wrap(~type, nrow = 3, scales = "free_y") +
-            theme(#panel.spacing = unit(3,"lines"),
-                  text = element_text(size = 15)) +
-            labs(title = "Percentage of Aid Awarded by Year",
-                 y = "Percentage",
-                 x = "Academic Year") 
+```{r tests}
+# Testing a graph on here. 
+
+# ggplot(institutions_percent, aes_string(x = "academic_year", 
+#                                                     y = "student_loans",
+#                                                     color = "type")) +
+#             geom_line() +
+#             geom_point(size = 1) +
+#             theme_gray() +
+#             #facet_wrap(~type, nrow = 3, scales = "free_y") +
+#             theme(#panel.spacing = unit(3,"lines"),
+#                   text = element_text(size = 15)) +
+#             labs(title = "Percentage of Aid Awarded by Year",
+#                  y = "Percentage",
+#                  x = "Academic Year") 
 ```
 
