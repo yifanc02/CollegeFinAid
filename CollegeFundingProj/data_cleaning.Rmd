@@ -1,0 +1,260 @@
+---
+title: "Gather.Rmd"
+author: "Yifan Chen"
+date: "12/4/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+This is a rmarkdown document where I save all of my data cleaning and wrangling
+work for my final project in Gov50. 
+
+```{r creating dataset}
+allinstitutions <- read_excel("PercentageFinancialAid2000-2018.xls", skip = 1) %>%
+  select(1:8, 13:16)
+
+# Renaming columns to make the variables understandable
+
+colnames(allinstitutions) <- c("academic_year", "enrollment", 
+                              "total_number_awarded", "total_percent_awarded",
+                              "fed", "state_local", "institutional", 
+                              "student_loans", "fed_amt", "state_local_amt", 
+                              "institutional_amt",
+                              "loan_amt")
+
+allinstitutions <- allinstitutions %>%
+  mutate(academic_year = as.numeric(substr(academic_year, 1, 4)))
+
+# This selects for the information that takes into percentage of students receiving
+# aid (in all forms) across all institutions
+allinstitutions_percent <- allinstitutions %>%
+  select(1:8) %>%
+  slice(5:22) %>% 
+  drop_na() %>%
+  mutate(type = "All")
+
+# Making a function to make this process easier
+select_type <- function(row_select, x){
+  allinstitutions %>%
+    select(1:8) %>%
+    mutate(academic_year = as.numeric(substr(academic_year, 1, 4))) %>%
+    slice(row_select)
+  
+}
+
+# Now I will filter by type of university by creating separate objects first. 
+public <- select_type(24:31) %>%
+  mutate(type = "Public")
+
+private4prof <- select_type(78:85) %>%
+  mutate(type = "Private For-Profit Colleges")
+
+privatenonprof <- select_type(51:58) %>%
+  mutate(type = "Private Nonprofit Colleges")
+
+# Bind them all together
+
+institutions_percent <- bind_rows(list(public, private4prof, privatenonprof)) %>%
+mutate_at(vars(fed:student_loans), as.numeric)
+
+#Turning this into a RDS file. 
+
+saveRDS(institutions_percent, file = "institutions_percent.rds")
+
+# We now turn to the average amount of aid that students receive.
+allinstitutions_amt <- allinstitutions %>%
+  select(1, 9:12) %>%
+  slice(5:22) %>% 
+  drop_na() %>%
+  mutate(type = "All")
+
+# Creating a function like the one above, but this time it's for the amount of
+# aid rather than the percentage. 
+select_type2 <- function(row_select, x){
+  allinstitutions %>%
+    select(1, 9:12) %>%
+    slice(row_select)
+  
+}
+
+# Following a similar workflow as before, filtered by different types of
+# institution and creating a column called "Type" so I can use facet wrap to
+# separate them later.
+
+public_amt <- select_type2(24:31) %>%
+  mutate(type = "Public")
+
+private4prof_amt <- select_type2(78:85) %>%
+  mutate(type = "Private For-Profit Colleges")
+
+privatenonprof_amt <- select_type2(51:58) %>%
+  mutate(type = "Private Nonprofit Colleges")
+
+# Binding them all together into a new object called institutions amount. This
+# is the data that I will plot in my shiny app.
+
+institutions_amt <- bind_rows(list(public_amt, private4prof_amt, 
+                                   privatenonprof_amt)) %>%
+  mutate_at(vars(fed_amt:loan_amt), as.numeric) %>%
+  
+  # I had to rename this so that in Shinyapp, the selectInput type can recognize
+  # the 
+  rename(fed = fed_amt,
+         state_local = state_local_amt,
+         student_loans = loan_amt,
+         institutional = institutional_amt)
+
+saveRDS(institutions_amt, file = "institutions_amt.rds")
+
+```
+
+```{r demographic}
+#Now lets turn to personal characteristics
+
+characteristics_1516 <- read_excel("Student_Characteristics_Aid15-16.xls", skip = 2)
+ 
+#By sex, race, and family income level, marital status, and housing arrangement
+
+characteristics_1516 <- characteristics_1516 %>%
+slice(c(5:6, 9:15, 18:20, 23:25, 29:34, 43:45)) %>%
+  select(1, 2, 8, 14, 20)
+
+colnames(characteristics_1516) <- c("characteristic", 
+                               "any_aid", 
+                               "grants", 
+                               "loans",
+                               "work_study")
+
+# Sex, race, age, marital status, income, housing status 15-16, thinking about 
+# doing this by year: 03-04, 07-08, 11-12 as well. 
+# But not all the variables are available for those academic years at the moment,
+# thinking about how to incorporate that. 
+
+# Upon further examination, I should have written a function for this, but it 
+# all works now. 
+
+sex <- characteristics_1516 %>%
+  slice(1:2) %>%
+  clean_names() %>%
+  select(characteristic, any_aid, grants, loans, work_study) %>%
+  mutate(data_type = "sex")
+         
+race <- characteristics_1516 %>%
+  slice(3:9) %>%
+  clean_names() %>%
+  select(characteristic, any_aid, grants, loans, work_study) %>%
+  drop_na() %>%
+  mutate(data_type = "race")
+
+age <- characteristics_1516 %>%
+  slice(10:12) %>%
+  clean_names() %>%
+  select(characteristic, any_aid, grants, loans, work_study) %>%
+  mutate(data_type = "age")
+
+marital <- characteristics_1516 %>%
+  slice(13:15) %>%
+  clean_names() %>%
+  select(characteristic, any_aid, grants, loans, work_study) %>%
+  mutate(data_type = "marital_status")
+
+fam_inc <- characteristics_1516 %>%
+  slice(16:21) %>%
+  clean_names() %>%
+  select(characteristic, any_aid, grants, loans, work_study) %>%
+  mutate(data_type = "fam_inc")
+
+housing <- characteristics_1516 %>%
+  slice(22:24) %>%
+  clean_names() %>%
+  select(characteristic, any_aid, grants, loans, work_study) %>%
+  mutate(data_type = "housing")
+
+# Now, it's time to combine this all together into one object.
+demographic <- bind_rows(sex, race, fam_inc, marital, housing, age) %>%
+  
+  # This involves some cleaning with missing data, and renaming some rows with
+  # odd and irrelevant symbols.
+  mutate(work_study = ifelse(work_study == "‡", 0, work_study)) %>%
+  mutate(characteristic = str_remove_all(characteristic, "\\.|\\\\5|\\\\")) %>%
+  
+  # Pivot the table format so we have a column specifying the type of aid the 
+  # students received, and the average amount of aid in that category. 
+  pivot_longer(cols = c(-characteristic, -data_type), names_to = "aid_type", values_to = "amount") %>%
+  mutate(amount = as.numeric(amount))
+
+saveRDS(demographic, file = "demographic.rds")
+
+```
+
+
+```{r model data}
+
+# Creating the model now. After visualizing all this data, I think the most 
+# interesting question for me is how do the wealth of the student body 
+# relate to what percentage of them receives a certain type of aid or takes out
+# loans?
+model_data_1819 <- model_data %>% 
+  select(GIS4N2, GIS4N12, GIS4N22, GIS4N32, GIS4N42, GIS4N52, UFLOANP, IGRNT_P,
+         UPGRNTP, UAGRNTP) 
+
+model_data <- read_csv("sfa1819.csv")
+
+# Selecting the variables I need. 
+model_data_1819 <- model_data %>% 
+  select(GIS4N2, GIS4N12, GIS4N22, GIS4N32, GIS4N42, GIS4N52, UFLOANP, IGRNT_P,
+         UPGRNTP, UAGRNTP) %>%
+  
+  # I divided the total number of students enrolled at a given university into
+  # brackets presenting percentages in each income bracket. 
+  
+  mutate(totalnum = GIS4N2,
+         pctnum_0_30 = GIS4N12/totalnum*100,
+         pctnum_30_48 = GIS4N22/totalnum*100,
+         pctnum_0_48 = (GIS4N12 + GIS4N22)/totalnum*100,
+         pctnum_48_75 = GIS4N32/totalnum*100,
+         pctnum_75up = (GIS4N42 + GIS4N52)/totalnum*100,
+         pctnum_110 = GIS4N52/totalnum*100,
+         grant_aid = UAGRNTP,
+         instit_aid = IGRNT_P, 
+         loans = UFLOANP,
+         pell = UPGRNTP) %>%
+  select(totalnum:pell) %>%
+  drop_na()
+
+saveRDS(model_data_1819, file = "model_data_1819.rds")
+
+# Calculating proportions of entire data set, then multiply by 100
+incsum_data_1819 <- model_data %>% 
+  select(GIS4N2, GIS4N12, GIS4N22, GIS4N32, GIS4N42, GIS4N52, UFLOANP, IGRNT_P,
+         UPGRNTP, UAGRNTP) %>%
+  summarize(pct_0_30 = sum(GIS4N12, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE),
+            pct_38_48 = sum(GIS4N22, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE),
+            pct_48_75 = sum(GIS4N32, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE),
+            pct_75_110 = sum(GIS4N42, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE),
+            pct_110 = sum(GIS4N52, na.rm = TRUE)/sum(GIS4N2, na.rm = TRUE)) %>%
+  pivot_longer(cols = 1:5, names_to = "inc_bracket", values_to = "percentages")
+
+
+```
+
+```{r}
+# Test
+ggplot(institutions_percent, aes_string(x = "academic_year", 
+                                                    y = "student_loans",
+                                                    color = "type")) +
+            geom_line() +
+            geom_point(size = 1) +
+            theme_gray() +
+            #facet_wrap(~type, nrow = 3, scales = "free_y") +
+            theme(#panel.spacing = unit(3,"lines"),
+                  text = element_text(size = 15)) +
+            labs(title = "Percentage of Aid Awarded by Year",
+                 y = "Percentage",
+                 x = "Academic Year") 
+```
+
