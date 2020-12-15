@@ -7,6 +7,18 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(shiny)
+library(shinythemes)
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(gifski)
+library(rstanarm)
+library(gt)
+library(gtsummary)
+library(broom.mixed)
+library(ggthemes)
 ```
 
 ## R Markdown
@@ -14,7 +26,8 @@ This is a rmarkdown document where I save all of my data cleaning and wrangling
 work for my final project in Gov50. 
 
 ```{r creating dataset}
-allinstitutions <- read_excel("PercentageFinancialAid2000-2018.xls", skip = 1) %>%
+allinstitutions <- read_excel("PercentageFinancialAid2000-2018.xls", 
+                              skip = 1) %>%
   select(1:8, 13:16)
 
 # Renaming columns to make the variables understandable
@@ -26,11 +39,17 @@ colnames(allinstitutions) <- c("academic_year", "enrollment",
                               "institutional_amt",
                               "loan_amt")
 
+# Suppress warning here because some observations in academic year aren't 
+# numeric, they're characters that I will eventually clean out, so the warning
+# is not very relevant. 
+
+
 allinstitutions <- allinstitutions %>%
   mutate(academic_year = as.numeric(substr(academic_year, 1, 4)))
-
+suppressWarnings(expr)
 # This selects for the information that takes into percentage of students receiving
 # aid (in all forms) across all institutions
+
 allinstitutions_percent <- allinstitutions %>%
   select(1:8) %>%
   slice(5:22) %>% 
@@ -38,6 +57,7 @@ allinstitutions_percent <- allinstitutions %>%
   mutate(type = "All")
 
 # Making a function to make this process easier
+
 select_type <- function(row_select, x){
   allinstitutions %>%
     select(1:8) %>%
@@ -115,9 +135,14 @@ saveRDS(institutions_amt, file = "institutions_amt.rds")
 ```{r demographic}
 #Now lets turn to personal characteristics
 
-characteristics_1516 <- read_excel("Student_Characteristics_Aid15-16.xls", skip = 2)
- 
-#By sex, race, and family income level, marital status, and housing arrangement
+characteristics_1516 <- read_excel("Student_Characteristics_Aid15-16.xls", 
+                                   skip = 2)
+suppressWarnings(expr)
+
+# Suppressing another warning here because they're telling me the columns names 
+# have been changed, not a big deal since I will be renaming these column names
+# in the code below after I select:
+# By sex, race, and family income level, marital status, and housing arrangement
 
 characteristics_1516 <- characteristics_1516 %>%
 slice(c(5:6, 9:15, 18:20, 23:25, 29:34, 43:45)) %>%
@@ -175,16 +200,20 @@ housing <- characteristics_1516 %>%
   mutate(data_type = "housing")
 
 # Now, it's time to combine this all together into one object.
+
 demographic <- bind_rows(sex, race, fam_inc, marital, housing, age) %>%
   
   # This involves some cleaning with missing data, and renaming some rows with
   # odd and irrelevant symbols.
+  
   mutate(work_study = ifelse(work_study == "‡", 0, work_study)) %>%
   mutate(characteristic = str_remove_all(characteristic, "\\.|\\\\5|\\\\")) %>%
   
   # Pivot the table format so we have a column specifying the type of aid the 
   # students received, and the average amount of aid in that category. 
-  pivot_longer(cols = c(-characteristic, -data_type), names_to = "aid_type", values_to = "amount") %>%
+  
+  pivot_longer(cols = c(-characteristic, -data_type), names_to = "aid_type", 
+               values_to = "amount") %>%
   mutate(amount = as.numeric(amount))
 
 saveRDS(demographic, file = "demographic.rds")
@@ -198,13 +227,22 @@ saveRDS(demographic, file = "demographic.rds")
 # interesting question for me is how do the wealth of the student body 
 # relate to what percentage of them receives a certain type of aid or takes out
 # loans?
+
+model_data <- read_csv("sfa1819.csv")
+
+#Suppressing once again because R wants me to specify column types for all the
+# 200+ columns,but I only need a select few, so specifying all of them would 
+# take up too much irrelevant space since I won't be using more of the variables
+# anywya.
+
+suppressWarnings(expr)
+
 model_data_1819 <- model_data %>% 
   select(GIS4N2, GIS4N12, GIS4N22, GIS4N32, GIS4N42, GIS4N52, UFLOANP, IGRNT_P,
          UPGRNTP, UAGRNTP) 
 
-model_data <- read_csv("sfa1819.csv")
-
 # Selecting the variables I need. 
+
 model_data_1819 <- model_data %>% 
   select(GIS4N2, GIS4N12, GIS4N22, GIS4N32, GIS4N42, GIS4N52, UFLOANP, IGRNT_P,
          UPGRNTP, UAGRNTP) %>%
@@ -229,6 +267,9 @@ model_data_1819 <- model_data %>%
 saveRDS(model_data_1819, file = "model_data_1819.rds")
 
 # Calculating proportions of entire data set, then multiply by 100
+
+suppressWarnings(expr)
+
 incsum_data_1819 <- model_data %>% 
   select(GIS4N2, GIS4N12, GIS4N22, GIS4N32, GIS4N42, GIS4N52, UFLOANP, IGRNT_P,
          UPGRNTP, UAGRNTP) %>%
@@ -243,7 +284,9 @@ incsum_data_1819 <- model_data %>%
 ```
 
 ```{r}
-# Test
+# Tests. I run tests of my plots here, here's an example of a line plot I ran
+# that appears in my tabl Institutional Trends 2000-2018!
+
 ggplot(institutions_percent, aes_string(x = "academic_year", 
                                                     y = "student_loans",
                                                     color = "type")) +
